@@ -1,7 +1,23 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>Qoi</RootNamespace>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <Authors>Christoph Duzy</Authors>
+    <Product>QOI-Converter</Product>
+    <Description>A .Net encoder and decoder for the Quite OK Image Format.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://duzychri.github.io/projects/qoi-converter</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+	<VersionPrefix>1.0.0</VersionPrefix>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
 </Project>
