@@ -8,7 +8,7 @@
     <Product>QOI-Converter</Product>
     <Description>A .Net encoder and decoder for the Quite OK Image Format.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RepositoryUrl>https://duzychri.github.io/projects/qoi-converter</RepositoryUrl>
+    <RepositoryUrl>https://github.com/duzychri/QOI-Converter</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 	<VersionPrefix>1.0.0</VersionPrefix>
   </PropertyGroup>
