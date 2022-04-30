@@ -18,10 +18,6 @@ namespace Qoi
         public readonly byte[] buffer;
         private readonly BufferMode mode;
 
-        /**
-         * Creates a new QoiArray class.
-         * @param {number | Uint8Array} capacityOrBuffer The capacity of the empty array or an already allocated array.
-         */
         public Buffer(byte[] buffer)
         {
             if (buffer is null) { throw new ArgumentNullException(nameof(buffer)); }
@@ -261,11 +257,6 @@ namespace Qoi
 
         #region General Methods
 
-        /**
-         * Writes an 8-bit integer value to the output buffer.
-         * @param {number} value The integer to write.
-         * @throws The value is not an integer or larger than 8 bit.
-         */
         private void Write8(byte value)
         {
             if (mode == BufferMode.Read)
@@ -276,11 +267,6 @@ namespace Qoi
             offset += 1;
         }
 
-        /**
-         * Writes an 32-bit integer value to the output buffer.
-         * @param {number} value The integer to write.
-         * @throws The value is not an integer.
-         */
         private void Write32(int value)
         {
             if (mode == BufferMode.Read)
@@ -295,10 +281,6 @@ namespace Qoi
             offset += 4;
         }
 
-        /**
-         * Read an 8-bit integer from the input buffer, but doesn"t increment the offset.
-         * @returns A 8-bit integer.
-         */
         private byte Peek8()
         {
             if (mode == BufferMode.Write)
@@ -308,10 +290,6 @@ namespace Qoi
             return buffer[offset];
         }
 
-        /**
-         * Read an 8-bit integer from the input buffer.
-         * @returns A 8-bit integer.
-         */
         private byte Read8()
         {
             if (mode == BufferMode.Write)
@@ -323,10 +301,6 @@ namespace Qoi
             return value;
         }
 
-        /**
-         * Read an 32-bit integer from the input buffer.
-         * @returns A 32-bit integer.
-         */
         private int Read32()
         {
             if (mode == BufferMode.Write)

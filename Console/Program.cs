@@ -20,11 +20,15 @@ public static class Program
     }
 
     private static void TestEncoding(string name, string imagePath, string qoiPath)
-    {
+    {        
         // Encode
         Image image = Image.FromFile(imagePath);
         byte[] pixels = ExtractPixelsFromImage(image);
+        using MemoryStream pixelStream = new MemoryStream(pixels);
         byte[] encodedQoiBytes = QoiConverter.Encode(pixels, image.Width, image.Height, Channels.Rgba, Colorspace.Linear);
+        byte[] encodedQoiBytesStream = QoiConverter.Encode(pixelStream, image.Width, image.Height, Channels.Rgba, Colorspace.Linear);
+
+        bool streamVersionWorks = encodedQoiBytes.SequenceEqual(encodedQoiBytesStream);
 
         // Decode
         byte[] qoiBytes = File.ReadAllBytes(qoiPath);
@@ -33,6 +37,7 @@ public static class Program
         // Check Encoding
         bool encodingSuccess = encodedQoiBytes.SequenceEqual(qoiBytes);
         Console.WriteLine(encodingSuccess ? $"Encoding image {name} was successfull!" : $"Encoding image {name} failed!");
+        Console.WriteLine(encodingSuccess && streamVersionWorks ? $"Encoding image {name} (as stream) was successfull!" : $"Encoding image {name} (as stream) failed!");
 
         // Check Decoding
         bool decodingSuccess = decodedImage.pixels.SequenceEqual(pixels) && image.Width == decodedImage.width && image.Height == decodedImage.height;

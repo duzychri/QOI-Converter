@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using static Qoi.Constants;
 
 namespace Qoi
@@ -8,6 +9,130 @@ namespace Qoi
     /// </summary>
     public static class QoiConverter
     {
+        private static bool CanGetLength(Stream stream)
+        {
+            try
+            { return stream.Length >= 0; }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Encodes an image into a QOI format <see cref="byte"/> array.
+        /// </summary>
+        /// <param name="pixels">The pixels of the image.</param>
+        /// <param name="width">The width of the image.</param>
+        /// <param name="height">The height of the image.</param>
+        /// <param name="channels">The amount of channels of the pixel.</param>
+        /// <param name="colorspace">The colorspace of the image.</param>
+        /// <returns>The <see cref="byte"/> array in the QOI format.</returns>
+        /// <exception cref="ArgumentException">The input parameters are invalid.</exception>
+        public static byte[] Encode(Stream pixels, int width, int height, Channels channels, Colorspace colorspace)
+        {
+            if (width <= 0)
+            { throw new ArgumentException("Parameter 'width' has to be larger than 0."); }
+            if (height <= 0)
+            { throw new ArgumentException("Parameter 'height' has to be larger than 0."); }
+            if (pixels.CanRead == false)
+            { throw new ArgumentException("Parameter 'pixels' needs to be readable."); }
+            if (CanGetLength(pixels) == false)
+            { throw new ArgumentException("Parameter 'pixels' size of stream has to be accessible with the Length property."); }
+            if (pixels.Length < HEADER_SIZE + END_MARKER_SIZE || pixels.Length < width * height * (int)channels)
+            { throw new ArgumentException("Parameter 'buffer' is to small."); }
+
+            long endOffset = pixels.Length - (int)channels;
+            int outputCapacity = width * height * ((int)channels + 1) + HEADER_SIZE + END_MARKER_SIZE;
+
+            Color[] seenPixels = new Color[64];
+            Buffer outputBytes = new Buffer(outputCapacity);
+
+            byte run = 0;
+            Color previousColor = new Color(0, 0, 0, 255);
+
+            outputBytes.WriteHeader(width, height, (byte)channels, (byte)colorspace);
+
+            Color ReadColor()
+            {
+                int r = pixels.ReadByte();
+                int g = pixels.ReadByte();
+                int b = pixels.ReadByte();
+                int a = channels == Channels.Rgba ? pixels.ReadByte() : previousColor.a;
+
+                if (r == -1 || g == -1 || b == -1 || a == -1)
+                { throw new ArgumentException("Parameter 'pixels' does not have the right number of bytes."); }
+
+                return new Color(r, g, b, a);
+            }
+
+            for (int readOffset = 0; readOffset <= endOffset; readOffset += (int)channels)
+            {
+                Color color = ReadColor();
+
+                if (color == previousColor)
+                {
+                    run++;
+                    if (run == 62 || readOffset == endOffset)
+                    {
+                        outputBytes.WriteRun(run);
+                        run = 0;
+                    }
+                }
+                else
+                {
+                    if (run > 0)
+                    {
+                        outputBytes.WriteRun(run);
+                        run = 0;
+                    }
+
+                    byte hash = (byte)color.GetHashCode();
+                    if (color == seenPixels[hash])
+                    {
+                        outputBytes.WriteIndex(hash);
+                    }
+                    else
+                    {
+                        seenPixels[hash] = color;
+                        Color difference = color - previousColor;
+
+                        if (difference.a == 0)
+                        {
+                            int dr_dg = difference.r - difference.g;
+                            int db_dg = difference.b - difference.g;
+
+                            if (difference.r >= -2 && difference.r <= 1 &&
+                                difference.g >= -2 && difference.g <= 1 &&
+                                difference.b >= -2 && difference.b <= 1)
+                            {
+                                outputBytes.WriteDiff(difference);
+                            }
+                            else if (
+                                difference.g >= -32 && difference.g <= 31 &&
+                                dr_dg >= -8 && dr_dg <= 7 &&
+                                db_dg >= -8 && db_dg <= 7)
+                            {
+                                outputBytes.WriteLuma(difference);
+                            }
+                            else
+                            {
+                                outputBytes.WriteRGB(color);
+                            }
+                        }
+                        else
+                        {
+                            outputBytes.WriteRGBA(color);
+                        }
+                    }
+
+                    previousColor = color;
+                }
+            }
+
+            outputBytes.WriteEndMarker();
+
+            return outputBytes.ToArray();
+
+        }
+
         /// <summary>
         /// Encodes an image into a QOI format <see cref="byte"/> array.
         /// </summary>
