@@ -9,12 +9,7 @@ namespace Qoi
     /// </summary>
     public static class QoiConverter
     {
-        private static bool CanGetLength(Stream stream)
-        {
-            try
-            { return stream.Length >= 0; }
-            catch { return false; }
-        }
+        #region Encode
 
         /// <summary>
         /// Encodes an image into a QOI format <see cref="byte"/> array.
@@ -39,98 +34,7 @@ namespace Qoi
             if (pixels.Length < HEADER_SIZE + END_MARKER_SIZE || pixels.Length < width * height * (int)channels)
             { throw new ArgumentException("Parameter 'buffer' is to small."); }
 
-            long endOffset = pixels.Length - (int)channels;
-            int outputCapacity = width * height * ((int)channels + 1) + HEADER_SIZE + END_MARKER_SIZE;
-
-            Color[] seenPixels = new Color[64];
-            Buffer outputBytes = new Buffer(outputCapacity);
-
-            byte run = 0;
-            Color previousColor = new Color(0, 0, 0, 255);
-
-            outputBytes.WriteHeader(width, height, (byte)channels, (byte)colorspace);
-
-            Color ReadColor()
-            {
-                int r = pixels.ReadByte();
-                int g = pixels.ReadByte();
-                int b = pixels.ReadByte();
-                int a = channels == Channels.Rgba ? pixels.ReadByte() : previousColor.a;
-
-                if (r == -1 || g == -1 || b == -1 || a == -1)
-                { throw new ArgumentException("Parameter 'pixels' does not have the right number of bytes."); }
-
-                return new Color(r, g, b, a);
-            }
-
-            for (int readOffset = 0; readOffset <= endOffset; readOffset += (int)channels)
-            {
-                Color color = ReadColor();
-
-                if (color == previousColor)
-                {
-                    run++;
-                    if (run == 62 || readOffset == endOffset)
-                    {
-                        outputBytes.WriteRun(run);
-                        run = 0;
-                    }
-                }
-                else
-                {
-                    if (run > 0)
-                    {
-                        outputBytes.WriteRun(run);
-                        run = 0;
-                    }
-
-                    byte hash = (byte)color.GetHashCode();
-                    if (color == seenPixels[hash])
-                    {
-                        outputBytes.WriteIndex(hash);
-                    }
-                    else
-                    {
-                        seenPixels[hash] = color;
-                        Color difference = color - previousColor;
-
-                        if (difference.a == 0)
-                        {
-                            int dr_dg = difference.r - difference.g;
-                            int db_dg = difference.b - difference.g;
-
-                            if (difference.r >= -2 && difference.r <= 1 &&
-                                difference.g >= -2 && difference.g <= 1 &&
-                                difference.b >= -2 && difference.b <= 1)
-                            {
-                                outputBytes.WriteDiff(difference);
-                            }
-                            else if (
-                                difference.g >= -32 && difference.g <= 31 &&
-                                dr_dg >= -8 && dr_dg <= 7 &&
-                                db_dg >= -8 && db_dg <= 7)
-                            {
-                                outputBytes.WriteLuma(difference);
-                            }
-                            else
-                            {
-                                outputBytes.WriteRGB(color);
-                            }
-                        }
-                        else
-                        {
-                            outputBytes.WriteRGBA(color);
-                        }
-                    }
-
-                    previousColor = color;
-                }
-            }
-
-            outputBytes.WriteEndMarker();
-
-            return outputBytes.ToArray();
-
+            return InternalEncode(pixels, width, height, channels, colorspace);
         }
 
         /// <summary>
@@ -152,91 +56,13 @@ namespace Qoi
             if (pixels.Length < HEADER_SIZE + END_MARKER_SIZE || pixels.Length < width * height * (int)channels)
             { throw new ArgumentException("Parameter 'buffer' is to small."); }
 
-            int endOffset = pixels.Length - (int)channels;
-            int outputCapacity = width * height * ((int)channels + 1) + HEADER_SIZE + END_MARKER_SIZE;
-
-            Color[] seenPixels = new Color[64];
-            Buffer outputBytes = new Buffer(outputCapacity);
-
-            byte run = 0;
-            Color previousColor = new Color(0, 0, 0, 255);
-
-            outputBytes.WriteHeader(width, height, (byte)channels, (byte)colorspace);
-
-
-            for (int readOffset = 0; readOffset <= endOffset; readOffset += (int)channels)
-            {
-                Color color = new Color(
-                    pixels[readOffset + 0],
-                    pixels[readOffset + 1],
-                    pixels[readOffset + 2],
-                    channels == Channels.Rgba ? pixels[readOffset + 3] : previousColor.a
-                );
-
-                if (color == previousColor)
-                {
-                    run++;
-                    if (run == 62 || readOffset == endOffset)
-                    {
-                        outputBytes.WriteRun(run);
-                        run = 0;
-                    }
-                }
-                else
-                {
-                    if (run > 0)
-                    {
-                        outputBytes.WriteRun(run);
-                        run = 0;
-                    }
-
-                    byte hash = (byte)color.GetHashCode();
-                    if (color == seenPixels[hash])
-                    {
-                        outputBytes.WriteIndex(hash);
-                    }
-                    else
-                    {
-                        seenPixels[hash] = color;
-                        Color difference = color - previousColor;
-
-                        if (difference.a == 0)
-                        {
-                            int dr_dg = difference.r - difference.g;
-                            int db_dg = difference.b - difference.g;
-
-                            if (difference.r >= -2 && difference.r <= 1 &&
-                                difference.g >= -2 && difference.g <= 1 &&
-                                difference.b >= -2 && difference.b <= 1)
-                            {
-                                outputBytes.WriteDiff(difference);
-                            }
-                            else if (
-                                difference.g >= -32 && difference.g <= 31 &&
-                                dr_dg >= -8 && dr_dg <= 7 &&
-                                db_dg >= -8 && db_dg <= 7)
-                            {
-                                outputBytes.WriteLuma(difference);
-                            }
-                            else
-                            {
-                                outputBytes.WriteRGB(color);
-                            }
-                        }
-                        else
-                        {
-                            outputBytes.WriteRGBA(color);
-                        }
-                    }
-
-                    previousColor = color;
-                }
-            }
-
-            outputBytes.WriteEndMarker();
-
-            return outputBytes.ToArray();
+            MemoryStream pixelStream = new MemoryStream(pixels);
+            return InternalEncode(pixelStream, width, height, channels, colorspace);
         }
+
+        #endregion Encode
+
+        #region Decode
 
         /// <summary>
         /// Decodes a byte array in the QOI format into an image.
@@ -348,5 +174,113 @@ namespace Qoi
 
             return (pixels: outputBuffer, width: header.width, height: header.height, channels: channels, colorspace: (Colorspace)header.colorspace);
         }
+
+        #endregion Decode
+
+        #region Utility Methods
+
+        private static bool CanGetLength(Stream stream)
+        {
+            try
+            { return stream.Length >= 0; }
+            catch { return false; }
+        }
+
+        private static byte[] InternalEncode(Stream pixels, int width, int height, Channels channels, Colorspace colorspace)
+        {
+            long endOffset = pixels.Length - (int)channels;
+            int outputCapacity = width * height * ((int)channels + 1) + HEADER_SIZE + END_MARKER_SIZE;
+
+            Color[] seenPixels = new Color[64];
+            Buffer outputBytes = new Buffer(outputCapacity);
+
+            byte run = 0;
+            Color previousColor = new Color(0, 0, 0, 255);
+
+            outputBytes.WriteHeader(width, height, (byte)channels, (byte)colorspace);
+
+            Color ReadColor()
+            {
+                int r = pixels.ReadByte();
+                int g = pixels.ReadByte();
+                int b = pixels.ReadByte();
+                int a = channels == Channels.Rgba ? pixels.ReadByte() : previousColor.a;
+
+                if (r == -1 || g == -1 || b == -1 || a == -1)
+                { throw new ArgumentException("Parameter 'pixels' does not have the right number of bytes."); }
+
+                return new Color(r, g, b, a);
+            }
+
+            for (int readOffset = 0; readOffset <= endOffset; readOffset += (int)channels)
+            {
+                Color color = ReadColor();
+
+                if (color == previousColor)
+                {
+                    run++;
+                    if (run == 62 || readOffset == endOffset)
+                    {
+                        outputBytes.WriteRun(run);
+                        run = 0;
+                    }
+                }
+                else
+                {
+                    if (run > 0)
+                    {
+                        outputBytes.WriteRun(run);
+                        run = 0;
+                    }
+
+                    byte hash = (byte)color.GetHashCode();
+                    if (color == seenPixels[hash])
+                    {
+                        outputBytes.WriteIndex(hash);
+                    }
+                    else
+                    {
+                        seenPixels[hash] = color;
+                        Color difference = color - previousColor;
+
+                        if (difference.a == 0)
+                        {
+                            int dr_dg = difference.r - difference.g;
+                            int db_dg = difference.b - difference.g;
+
+                            if (difference.r >= -2 && difference.r <= 1 &&
+                                difference.g >= -2 && difference.g <= 1 &&
+                                difference.b >= -2 && difference.b <= 1)
+                            {
+                                outputBytes.WriteDiff(difference);
+                            }
+                            else if (
+                                difference.g >= -32 && difference.g <= 31 &&
+                                dr_dg >= -8 && dr_dg <= 7 &&
+                                db_dg >= -8 && db_dg <= 7)
+                            {
+                                outputBytes.WriteLuma(difference);
+                            }
+                            else
+                            {
+                                outputBytes.WriteRGB(color);
+                            }
+                        }
+                        else
+                        {
+                            outputBytes.WriteRGBA(color);
+                        }
+                    }
+
+                    previousColor = color;
+                }
+            }
+
+            outputBytes.WriteEndMarker();
+
+            return outputBytes.ToArray();
+        }
+
+        #endregion Utility Methods
     }
 }
